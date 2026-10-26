@@ -1,0 +1,15 @@
+{
+  "name": "kundserviceportalen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kundserviceportalen – skelett (backend + frontend i separata mappar)",
+  "workspaces": ["backend", "frontend"],
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "start": "npm run start --workspace backend",
+    "dev": "npm run dev --workspace backend",
+    "test": "npm run test --workspaces",
+    "test:backend": "npm run test --workspace backend",
+    "test:frontend": "npm run test --workspace frontend"
+  }
+}

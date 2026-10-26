@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kundserviceportalen</title>
+  <style>
+    /* ===== DELAT SKELETT: grundstil. Del 3 och Del 4 lägger egen CSS under sina markeringar längst ner. ===== */
+    :root {
+      --bg: #f3f5f7;
+      --surface: #ffffff;
+      --text: #1b2733;
+      --muted: #5b6b79;
+      --border: #d3dae0;
+      --accent: #1d5fa8;
+      --error: #b42318;
+      --ok: #1a7f4b;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); line-height: 1.5; }
+    .topbar { display: flex; align-items: center; gap: 2rem; padding: 0.75rem 1.5rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .topbar h1 { margin: 0; font-size: 1.15rem; }
+    nav { display: flex; gap: 0.5rem; }
+    nav button { font: inherit; padding: 0.4rem 0.9rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; }
+    nav button[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    main { max-width: 60rem; margin: 1.5rem auto; padding: 0 1.5rem; }
+    section[data-view] { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; }
+    section[data-view][hidden] { display: none; }
+    h2 { margin-top: 0; font-size: 1.1rem; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .field-error { display: block; min-height: 1.25rem; color: var(--error); font-size: 0.9rem; }
+    [aria-invalid="true"] { border-color: var(--error); }
+    #global-message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid var(--error); background: #fdecea; color: var(--error); }
+    #global-message[data-kind="ok"] { border-color: var(--ok); background: #e8f5ee; color: var(--ok); }
+    #global-message[hidden] { display: none; }
+    .placeholder { margin: 0; padding: 1rem; border: 2px dashed var(--border); border-radius: 6px; color: var(--muted); }
+
+    /* ===== DEL 3 – CSS för registreringsformuläret: lägg till här ===== */
+
+    /* ===== DEL 4 – CSS för lista, detalj, status och redigering: lägg till här ===== */
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Kundserviceportalen</h1>
+    <nav aria-label="Huvudmeny">
+      <button type="button" data-nav="list">Ärenden</button>
+      <button type="button" data-nav="new">Nytt ärende</button>
+    </nav>
+  </header>
+
+  <main>
+    <div id="global-message" role="alert" hidden></div>
+
+    <!-- ===== DEL 3: Registrera ärende (AK1–AK8) ===== -->
+    <section id="view-new" data-view="new" aria-labelledby="h-new" hidden>
+      <h2 id="h-new">Registrera nytt ärende</h2>
+      <p class="placeholder">Inte byggt ännu. Ägs av Del 3 (formulär för AK1–AK8).</p>
+      <!--
+        Kontrakt för formuläret:
+          - fältnamn (name=…): rubrik, beskrivning, kategori, prioritet, status, deadline
+          - vid varje fält ett <span class="field-error" data-error-for="<fältnamn>"></span>
+            som showFieldErrors() fyller med serverns meddelande
+          - skicka med api('POST', '/api/arenden', data)
+      -->
+    </section>
+
+    <!-- ===== DEL 4: Lista (AK10) ===== -->
+    <section id="view-list" data-view="list" aria-labelledby="h-list">
+      <h2 id="h-list">Ärenden</h2>
+      <p class="placeholder">Inte byggt ännu. Ägs av Del 4 (lista för AK10).</p>
+    </section>
+
+    <!-- ===== DEL 4: Detalj, ändra status och redigera (AK11–AK16) ===== -->
+    <section id="view-detail" data-view="detail" aria-labelledby="h-detail" hidden>
+      <h2 id="h-detail">Ärende</h2>
+      <p class="placeholder">Inte byggt ännu. Ägs av Del 4 (detalj, status och redigering för AK11–AK16).</p>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    /* ================================================================
+       DELAT SKELETT – ändras bara via en liten, granskad PR.
+       Tre funktioner som alla delar använder: api(), showView(), showFieldErrors().
+       ================================================================ */
+
+    // Samma värden som backend/src/constants.js. Risk: listorna kan glida isär –
+    // ett test som jämför dem vore en bra liten uppgift.
+    const PORTAL_CONFIG = Object.freeze({
+      KATEGORIER: ['Anmälan och inskrivning', 'Aktivitetsrapport', 'Ersättning och stöd', 'Jobb och sökning',
+                   'Utbildning och insatser', 'Digital tjänst och inloggning', 'Övrigt'],
+      STATUSAR: ['Nytt', 'Pågående', 'Väntar på kund', 'Avslutat'],
+      PRIORITETER: [1, 2, 3, 4, 5],
+      RUBRIK_MAX: 100,
+      BESKRIVNING_MAX: 5000,
+    });
+
+    /**
+     * Anropar backend. Kastar aldrig – fel kommer tillbaka som { ok:false, status, data }.
+     * data.fel = allmänt meddelande, data.faltfel = { fältnamn: meddelande } (se docs/API.md).
+     */
+    async function api(method, path, body) {
+      try {
+        const res = await fetch(path, {
+          method,
+          headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        let data = null;
+        try { data = await res.json(); } catch { /* svaret var inte JSON */ }
+        return { ok: res.ok, status: res.status, data };
+      } catch {
+        return { ok: false, status: 0, data: { fel: 'Kunde inte nå servern. Kontrollera att den är igång.' } };
+      }
+    }
+
+    function showView(name, arg) {
+      document.querySelectorAll('[data-view]').forEach((el) => { el.hidden = el.dataset.view !== name; });
+      document.querySelectorAll('[data-nav]').forEach((btn) => {
+        // "detail" hör till menyvalet Ärenden
+        const active = btn.dataset.nav === (name === 'detail' ? 'list' : name);
+        if (active) btn.setAttribute('aria-current', 'page'); else btn.removeAttribute('aria-current');
+      });
+      clearGlobalMessage();
+      if (name === 'new') onShowNewView();
+      if (name === 'list') onShowListView();
+      if (name === 'detail') onShowDetailView(arg);
+    }
+
+    function showGlobalMessage(text, kind = 'error') {
+      const el = document.getElementById('global-message');
+      el.textContent = text;
+      el.dataset.kind = kind;
+      el.hidden = false;
+    }
+    function clearGlobalMessage() {
+      const el = document.getElementById('global-message');
+      el.hidden = true;
+      el.textContent = '';
+    }
+
+    /** Skriver ut fältfel intill rätt fält: <span data-error-for="rubrik"> + aria-invalid på [name="rubrik"]. */
+    function showFieldErrors(form, faltfel = {}) {
+      clearFieldErrors(form);
+      for (const [falt, meddelande] of Object.entries(faltfel)) {
+        const out = form.querySelector(`[data-error-for="${falt}"]`);
+        const input = form.querySelector(`[name="${falt}"]`);
+        if (out) out.textContent = meddelande;
+        if (input) input.setAttribute('aria-invalid', 'true');
+      }
+    }
+    function clearFieldErrors(form) {
+      form.querySelectorAll('[data-error-for]').forEach((el) => { el.textContent = ''; });
+      form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+    }
+
+    /* ================================================================
+       DEL 3 – Registrera ärende (AK1–AK8)
+       Ägare: se docs/ARBETSFORDELNING.md. Rör bara det här blocket.
+       ================================================================ */
+
+    function initNewCaseView() {
+      // TODO Del 3: bygg formuläret, koppla "Registrera" till api('POST', '/api/arenden', …),
+      //             visa showFieldErrors(form, res.data.faltfel) vid fel och bekräftelse vid lyckat svar.
+    }
+    function onShowNewView() {
+      // TODO Del 3: nollställ formuläret när vyn visas.
+    }
+
+    /* ================================================================
+       DEL 4 – Lista, detalj, status och redigering (AK10–AK16)
+       Ägare: se docs/ARBETSFORDELNING.md. Rör bara det här blocket.
+       ================================================================ */
+
+    function initCaseViews() {
+      // TODO Del 4: koppla klick på ett ärende i listan till showView('detail', arendenummer).
+    }
+    function onShowListView() {
+      // TODO Del 4: hämta api('GET', '/api/arenden') och rita listan.
+    }
+    function onShowDetailView(arendenummer) {
+      // TODO Del 4: hämta api('GET', `/api/arenden/${encodeURIComponent(arendenummer)}`), visa alla fält,
+      //             statusbyte (PATCH /api/arenden/:arendenummer/status) och redigering (PATCH /api/arenden/:arendenummer).
+    }
+
+    /* ================================================================
+       START (delat skelett)
+       ================================================================ */
+
+    function init() {
+      document.querySelectorAll('[data-nav]').forEach((btn) => {
+        btn.addEventListener('click', () => showView(btn.dataset.nav));
+      });
+      initNewCaseView();
+      initCaseViews();
+      showView('list');
+    }
+
+    // Gör hjälpfunktionerna åtkomliga för tester och webbläsarens konsol.
+    window.Portal = { PORTAL_CONFIG, api, showView, showGlobalMessage, clearGlobalMessage, showFieldErrors, clearFieldErrors };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  </script>
+</body>
+</html>
