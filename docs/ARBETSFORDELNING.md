@@ -132,8 +132,8 @@ API.md             ──►  Del 3 och 4 kan bygga mot låtsassvar tills backen
 
 **Att besluta och dokumentera**
 
-- Vad visas i listan: alla fält eller ett urval (t.ex. ärendenummer, rubrik, status, deadline)? Specen kräver bara att alla ärenden visas.
-- Hur ser en tom lista ut?
+- Vad visas i listan: alla fält eller ett urval (t.ex. ärendenummer, rubrik, status, deadline)? Specen kräver bara att alla ärenden visas. Beslut 2026-10-28 (Katie): Listan visar ärendenummer, rubrik, prioritet, status och deadline.
+- Hur ser en tom lista ut? Beslut 2026-10-28 (Katie): Tom lista visar texten "Inga ärenden ännu".
 - Öppna fråga 1 i specen: ska ett ärende med passerad deadline som inte är avslutat markeras i listan? Tas bara med om teamet vill det, och då skrivs ett nytt acceptanskriterium först.
 
 **Risker värda att granska**
